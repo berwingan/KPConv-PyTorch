@@ -386,7 +386,7 @@ class KPFCNN(nn.Module):
         x = self.encoder_blocks[5](x,batch)
         x = self.encoder_blocks[6](x,batch)
         x2_0 = self.encoder_blocks[7](x,batch)
-        x1_1 = self.path_blocks[1][0](torch.cat([x1_0,self.upsample_path_blocks[1][0]](x2_0,batch),dim=1),batch)
+        x1_1 = self.path_blocks[1][0](torch.cat([x1_0,self.upsample_path_blocks[1][0](x2_0,batch)],dim=1),batch)
         x0_2 = self.path_blocks[0][1](torch.cat([x0_0,x0_1,self.upsample_path_blocks[0][1](x1_1,batch)],dim=1),batch)
         #segout here
 
