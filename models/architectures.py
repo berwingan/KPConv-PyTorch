@@ -206,6 +206,7 @@ class KPFCNN(nn.Module):
         self.K = config.num_kernel_points
         self.C = len(lbl_values) - len(ign_lbls)
 
+        
         #####################
         # List Encoder blocks
         #####################
@@ -214,10 +215,50 @@ class KPFCNN(nn.Module):
         self.encoder_blocks = nn.ModuleList()
         self.encoder_skip_dims = []
         self.encoder_skips = []
-
-        # Loop over consecutive blocks
+        ###################################
+        self.path_blocks = nn.ModuleList() #BERWIN CHANGE HERE 
+        self.upsample_path_blocks = nn.ModuleList()
+        #check how wide the skip paths should be BERWIN CHANGE HERE #################
+        path_size =-1
         for block_i, block in enumerate(config.architecture):
+            if('upsample' in block):
+                path_size +=1 #this should be 3 as of right now 
+        layer_count = path_size
+        upsample_count = path_size
+        upsample_var = 0 #only starts after the first strided layer 
+        # Loop over consecutive blocks
+        
+        for block_i, block in enumerate(config.architecture):
+            #create upsample for in path
+            if upsample_var and 'stided' in block:
+                self.upsample_layer_blocks = nn.ModuleList()
+                for num_block in range(upsample_count):
+                    self.upsample_layer_blocks.append(block_decider('nearest_upsample',
+                                                                    r,
+                                                                    in_dim,
+                                                                    out_dim,
+                                                                    layer,
+                                                                    config))
+                upsample_count-=1
+                self.upsample_path_blocks.append(self.upsample_layer_blocks)
 
+            #create skip path blocks here 
+            if layer_count>0 and 'strided' in block:
+                upsample_var+=1
+                self.layer_path = nn.ModuleList()
+                mul_var = 1
+                for num_block in range(layer_count):
+                    self.layer_path.append(block_decider('resnetb',
+                                                        r,
+                                                        (in_dim*2)+(out_dim*mul_var),
+                                                        out_dim,
+                                                        layer,
+                                                        config))
+                    mul_var+=1 #for the first layer it should create 3 blocks
+                layer_count-=1
+                self.path_blocks.append(self.layer_path) #[0][2] -top layer, last path block
+            
+            ##############CHANGE ENDS HERE FOR PATH BLOCKS
             # Check equivariance
             if ('equivariant' in block) and (not out_dim % 3 == 0):
                 raise ValueError('Equivariant block but features dimension is not a factor of 3')
@@ -267,16 +308,25 @@ class KPFCNN(nn.Module):
                 start_i = block_i
                 break
 
+        unary_in_dim_var = 0
         # Loop over consecutive blocks
         for block_i, block in enumerate(config.architecture[start_i:]):
 
-            # Add dimension of skip connection concat
+            # Add dimension of skip connection concat -unary block after the upsample
             if block_i > 0 and 'upsample' in config.architecture[start_i + block_i - 1]:
                 in_dim += self.encoder_skip_dims[layer]
                 self.decoder_concats.append(block_i)
+                self.decoder_blocks.append(block_decider(block,
+                                                    r,
+                                                    in_dim+(out_dim*(unary_in_dim_var)),
+                                                    out_dim,
+                                                    layer,
+                                                    config))
+                unary_in_dim_var+=1#to change the unary indim
 
             # Apply the good block function defining tf ops
-            self.decoder_blocks.append(block_decider(block,
+            else:#upsample and other blocks goes here 
+                self.decoder_blocks.append(block_decider(block,
                                                     r,
                                                     in_dim,
                                                     out_dim,
@@ -323,21 +373,60 @@ class KPFCNN(nn.Module):
 
         # Get input features
         x = batch.features.clone().detach()
+        seg_outputs = []#use this layer for supervising all 4 top layer 
+
+        x = self.encoder_blocks[0](x,batch)
+        x0_0 = self.encoder_blocks[1](x,batch)
+        x = self.encoder_blocks[2](x,batch)
+        x = self.encoder_blocks[3](x,batch)
+        x1_0 = self.encoder_blocks[4](x,batch)
+        x0_1 = self.path_blocks[0][0](torch.cat([x0_0, self.upsample_path_blocks[0][0](x1_0,batch)],dim=1),batch)
+        #segout append here
+
+        x = self.encoder_blocks[5](x,batch)
+        x = self.encoder_blocks[6](x,batch)
+        x2_0 = self.encoder_blocks[7](x,batch)
+        x1_1 = self.path_blocks[1][0](torch.cat([x1_0,self.upsample_path_blocks[1][0]](x2_0,batch),dim=1),batch)
+        x0_2 = self.path_blocks[0][1](torch.cat([x0_0,x0_1,self.upsample_path_blocks[0][1](x1_1,batch)],dim=1),batch)
+        #segout here
+
+        x = self.encoder_blocks[8](x,batch)
+        x = self.encoder_blocks[9](x,batch)
+        x3_0 = self.encoder_blocks[10](x,batch)
+        x2_1 = self.path_blocks[2][0](torch.cat([x2_0, self.upsample_path_blocks[2][0](x3_0,batch)],dim=1),batch)
+        x1_2 = self.path_blocks[1][1](torch.cat([x1_0,x1_1,self.upsample_path_blocks[1][1](x2_1,batch)],dim=1),batch)
+        x0_3 = self.path_blocks[0][2](torch.cat([x0_0,x0_1,x0_2, self.upsample_path_blocks[0][2](x1_2,batch)],dim=1),batch)
+        #segout here
+
+        x = self.encoder_blocks[11](x,batch)
+        x = self.encoder_blocks[12](x,batch)
+        x4_0 = self.encoder_blocks[13](x,batch)
+
+        #decoding starts
+        x = self.decoder_blocks[0](x4_0,batch)#upsample
+        x3_1 = self.decoder_blocks[1](torch.cat([x3_0,x],dim=1),batch)
+        x = self.decoder_blocks[2](x3_1,batch)#upsample
+        x2_2 = self.decoder_blocks[3](torch.cat([x2_0,x2_1,x],dim=1),batch)
+        x = self.decoder_blocks[4](x2_2,batch)#upsample
+        x1_3 = self.decoder_blocks[5](torch.cat([x1_0,x1_1,x1_2,x],dim=1),batch)
+        x = self.decoder_blocks[6](x1_3,batch)
+        x0_4 = self.decoder_blocks[7](torch.cat([x0_0,x0_1,x0_2,x0_3,x],dim=1),batch)
+        #segout here
 
         # Loop over consecutive blocks
-        skip_x = []
-        for block_i, block_op in enumerate(self.encoder_blocks):
-            if block_i in self.encoder_skips:
-                skip_x.append(x)
-            x = block_op(x, batch)
+        # skip_x = []
+        # for block_i, block_op in enumerate(self.encoder_blocks):
+        #     if block_i in self.encoder_skips: #skip features is here, 
+        #         skip_x.append(x)
+        #     x = block_op(x, batch)
 
-        for block_i, block_op in enumerate(self.decoder_blocks):
-            if block_i in self.decoder_concats:
-                x = torch.cat([x, skip_x.pop()], dim=1)
-            x = block_op(x, batch)
+        # for block_i, block_op in enumerate(self.decoder_blocks):
+        #     if block_i in self.decoder_concats:
+        #         x = torch.cat([x, skip_x.pop()], dim=1)
+        #     x = block_op(x, batch)
 
         # Head of network
-        x = self.head_mlp(x, batch)
+        x = self.head_mlp(x0_4, batch)
         x = self.head_softmax(x, batch)
 
         return x
@@ -345,6 +434,7 @@ class KPFCNN(nn.Module):
     def loss(self, outputs, labels):
         """
         Runs the loss on outputs of the model
+
         :param outputs: logits
         :param labels: labels
         :return: loss
