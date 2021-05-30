@@ -377,20 +377,20 @@ class KPFCNN(nn.Module):
 
         x = self.encoder_blocks[0](x,batch)
         x0_0 = self.encoder_blocks[1](x,batch)
-        x = self.encoder_blocks[2](x,batch)
+        x = self.encoder_blocks[2](x0_0,batch)#check all right after 
         x = self.encoder_blocks[3](x,batch)
         x1_0 = self.encoder_blocks[4](x,batch)
         x0_1 = self.path_blocks[0][0](torch.cat([x0_0, self.upsample_path_blocks[0][0](x1_0,batch)],dim=1),batch)
         #segout append here
 
-        x = self.encoder_blocks[5](x,batch)
+        x = self.encoder_blocks[5](x1_0,batch)#check right after encoder
         x = self.encoder_blocks[6](x,batch)
         x2_0 = self.encoder_blocks[7](x,batch)
         x1_1 = self.path_blocks[1][0](torch.cat([x1_0,self.upsample_path_blocks[1][0](x2_0,batch)],dim=1),batch)
         x0_2 = self.path_blocks[0][1](torch.cat([x0_0,x0_1,self.upsample_path_blocks[0][1](x1_1,batch)],dim=1),batch)
         #segout here
 
-        x = self.encoder_blocks[8](x,batch)
+        x = self.encoder_blocks[8](x2_0,batch)#right after
         x = self.encoder_blocks[9](x,batch)
         x3_0 = self.encoder_blocks[10](x,batch)
         x2_1 = self.path_blocks[2][0](torch.cat([x2_0, self.upsample_path_blocks[2][0](x3_0,batch)],dim=1),batch)
@@ -398,9 +398,9 @@ class KPFCNN(nn.Module):
         x0_3 = self.path_blocks[0][2](torch.cat([x0_0,x0_1,x0_2, self.upsample_path_blocks[0][2](x1_2,batch)],dim=1),batch)
         #segout here
 
-        x = self.encoder_blocks[11](x,batch)
+        x = self.encoder_blocks[11](x3_0,batch)
         x = self.encoder_blocks[12](x,batch)
-        x4_0 = self.encoder_blocks[13](x,batch)
+        x4_0 = self.encoder_blocks[13](x,batch)#last block of encoder
 
         #decoding starts
         x = self.decoder_blocks[0](x4_0,batch)#upsample
