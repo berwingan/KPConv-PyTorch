@@ -230,7 +230,7 @@ class KPFCNN(nn.Module):
         
         for block_i, block in enumerate(config.architecture):
             #create upsample for in path
-            if upsample_var and 'stided' in block:
+            if upsample_var>0 and 'strided' in block:
                 self.upsample_layer_blocks = nn.ModuleList()
                 for num_block in range(upsample_count):
                     self.upsample_layer_blocks.append(block_decider('nearest_upsample',
