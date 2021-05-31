@@ -199,7 +199,7 @@ class ModelTrainer:
                     torch.nn.utils.clip_grad_value_(net.parameters(), config.grad_clip_norm)
                 self.optimizer.step()
                 #BERWIN HERE
-                #torch.cuda.synchronize(self.device)
+                torch.cuda.synchronize(self.device)
 
                 t += [time.time()]
 
