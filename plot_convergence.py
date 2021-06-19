@@ -405,7 +405,7 @@ def compare_convergences_segment(dataset, list_of_paths, list_of_names=None):
         p = plt.plot(all_pred_epochs[i], all_mIoUs[i], '--', linewidth=1, label=name)
         plt.plot(all_snap_epochs[i], np.mean(all_snap_IoUs[i], axis=1), linewidth=1, color=p[-1].get_color())
     plt.xlabel('epochs')
-    plt.ylabel('IoU')
+    plt.ylabel('IoU')##print more plot here
 
     # Set limits for y axis
     #plt.ylim(0.55, 0.95)
@@ -699,6 +699,7 @@ def experiment_name_1():
     # Using the dates of the logs, you can easily gather consecutive ones. All logs should be of the same dataset.
     start = 'Log_2020-04-22_11-52-58'
     end = 'Log_2020-05-22_11-52-58'
+#Log_2021-06-04_15-47-29
 
     # Name of the result path
     res_path = 'results'

@@ -43,7 +43,7 @@ from sklearn.neighbors import KDTree
 
 from models.blocks import KPConv
 
-
+torch.backends.cudnn.enabled=True
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #           Trainer Class
@@ -219,7 +219,11 @@ class ModelTrainer:
                                          1000 * mean_dt[0],
                                          1000 * mean_dt[1],
                                          1000 * mean_dt[2]))
-
+                
+                print(torch.cuda.get_device_name(0))
+                print('Memory Usage:')
+                print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
+                print('Cached:   ', round(torch.cuda.memory_reserved(0)/1024**3,1), 'GB')
                 # Log file
                 if config.saving:
                     with open(join(config.saving_path, 'training.txt'), "a") as file:
@@ -233,6 +237,8 @@ class ModelTrainer:
 
 
                 self.step += 1
+                if (self.step%100==0):
+                    torch.cuda.empty_cache()
 
             ##############
             # End of epoch
